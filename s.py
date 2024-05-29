@@ -1,3 +1,4 @@
+import streamlit as st
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
@@ -8,22 +9,17 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
 
 load_dotenv()
 genai.configure(api_key="AIzaSyAhlaWdtv__3QhH8bL-kD4dEN0Mrrvn1Ts")
 
-app = Flask(__name__)
 
-
-def get_pdf_text(pdf_path):
+def get_pdf_text(pdf_docs):
     text = ""
-    print(pdf_path)
-    with open(pdf_path, 'rb') as f:
-        pdf_reader = PdfReader(f)
+    for pdf in pdf_docs:
+        pdf_reader = PdfReader(pdf)
         for page in pdf_reader.pages:
             text += page.extract_text()
-    print(text)
     return text
 
 
@@ -70,45 +66,33 @@ def user_input(user_question):
 
     response = chain.invoke(
         {"input_documents": docs, "question": user_question})
+
     print(response)
-    return response
+    st.write("Reply: ", response["output_text"])
 
 
-# folder_paths = ["C:\\Users\\Arjun\\Downloads\\12th CBSE NCERT\\Chemistry"]
+def main():
+    st.set_page_config("Chat PDF")
+    st.header("Prepare for your Exams with EduWiz")
 
-# for folder_path in folder_paths:
-#     # Check if the folder exists
-#     if os.path.isdir(folder_path):
-#         # Get all files in the folder
-#         text = ""
-#         for filename in os.listdir(folder_path):
-#             # Check if the file is a PDF
-#             if filename.endswith(".pdf"):
-#                 # Construct the full path to the PDF
-#                 pdf_path = os.path.join(folder_path, filename)
-#                 # Pass the PDF path to your function
-#                 text += get_pdf_text(pdf_path)
-#         text_chunks = get_text_chunks(text)
-#         get_vector_store(text_chunks)
-#     else:
-#         print(f"Folder '{folder_path}' does not exist.")
+    user_question = st.text_input("Ask a Question from the PDF Files")
 
+    if user_question:
+        user_input(user_question)
 
-@app.route('/ask', methods=['POST'])
-def process_user_input():
-    # Get user question from the request body
-    user_question = request.json.get('question')
-    if not user_question:
-        return jsonify({'error': 'Missing question in request body'}), 400
-
-    # Process the user question and generate response
-    try:
-        response = user_input(user_question)
-    except Exception as e:
-        response = f"Error processing your request: {str(e)}"
-
-    return jsonify({'response': response})
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader(
+            "Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                # print(raw_text)
+                text_chunks = get_text_chunks(raw_text)
+                # print(text_chunks)
+                get_vector_store(text_chunks)
+                st.success("Done")
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    main()
